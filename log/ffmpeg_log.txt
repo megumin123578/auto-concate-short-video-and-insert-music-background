@@ -8,10 +8,10 @@ ffmpeg version 2025-07-10-git-82aeee3c19-essentials_build-www.gyan.dev Copyright
   libavfilter    11.  1.100 / 11.  1.100
   libswscale      9.  0.100 /  9.  0.100
   libswresample   6.  0.100 /  6.  0.100
-[mov,mp4,m4a,3gp,3g2,mj2 @ 000002596b21fac0] Auto-inserting h264_mp4toannexb bitstream filter
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001c1f367fa80] Auto-inserting h264_mp4toannexb bitstream filter
 Input #0, concat, from 'temp.txt':
-  Duration: N/A, start: -0.021333, bitrate: 10771 kb/s
-  Stream #0:0(und): Video: h264 (Main) (avc1 / 0x31637661), yuv420p(progressive), 1080x1920 [SAR 1:1 DAR 9:16], 10611 kb/s, 60 fps, 60 tbr, 15360 tbn
+  Duration: N/A, start: -0.021333, bitrate: 11536 kb/s
+  Stream #0:0(und): Video: h264 (Main) (avc1 / 0x31637661), yuv420p(progressive), 1080x1920 [SAR 1:1 DAR 9:16], 11376 kb/s, 60 fps, 60 tbr, 15360 tbn
     Metadata:
       handler_name    : VideoHandler
       vendor_id       : [0][0][0][0]
@@ -26,7 +26,7 @@ Stream mapping:
 Output #0, mp4, to 'C:\Users\Admin\Documents\dev\ghep short\temp.mp4':
   Metadata:
     encoder         : Lavf62.1.102
-  Stream #0:0(und): Video: h264 (Main) (avc1 / 0x31637661), yuv420p(progressive), 1080x1920 [SAR 1:1 DAR 9:16], q=2-31, 10611 kb/s, 60 fps, 60 tbr, 15360 tbn
+  Stream #0:0(und): Video: h264 (Main) (avc1 / 0x31637661), yuv420p(progressive), 1080x1920 [SAR 1:1 DAR 9:16], q=2-31, 11376 kb/s, 60 fps, 60 tbr, 15360 tbn
     Metadata:
       handler_name    : VideoHandler
       vendor_id       : [0][0][0][0]
@@ -36,10 +36,10 @@ Output #0, mp4, to 'C:\Users\Admin\Documents\dev\ghep short\temp.mp4':
       handler_name    : SoundHandler
       vendor_id       : [0][0][0][0]
 Press [q] to stop, [?] for help
-[mov,mp4,m4a,3gp,3g2,mj2 @ 000002596b6fb040] Auto-inserting h264_mp4toannexb bitstream filter
-[mov,mp4,m4a,3gp,3g2,mj2 @ 000002596b8094c0] Auto-inserting h264_mp4toannexb bitstream filter
-[mov,mp4,m4a,3gp,3g2,mj2 @ 000002596b8e1cc0] Auto-inserting h264_mp4toannexb bitstream filter
-[mov,mp4,m4a,3gp,3g2,mj2 @ 000002596b8e1780] Auto-inserting h264_mp4toannexb bitstream filter
-[mov,mp4,m4a,3gp,3g2,mj2 @ 000002596b287800] Auto-inserting h264_mp4toannexb bitstream filter
-[out#0/mp4 @ 000002596b237a80] video:59039KiB audio:933KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 0.132315%
-frame= 2880 fps=0.0 q=-1.0 Lsize=   60051KiB time=00:00:47.97 bitrate=10254.8kbits/s speed= 367x elapsed=0:00:00.13    
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001c1f3738500] Auto-inserting h264_mp4toannexb bitstream filter
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001c1f36881c0] Auto-inserting h264_mp4toannexb bitstream filter
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001c1f36953c0] Auto-inserting h264_mp4toannexb bitstream filter
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001c1f36e7780] Auto-inserting h264_mp4toannexb bitstream filter
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001c1f36e6d00] Auto-inserting h264_mp4toannexb bitstream filter
+[out#0/mp4 @ 000001c1f3697400] video:63858KiB audio:931KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 0.122477%
+frame= 2880 fps=0.0 q=-1.0 Lsize=   64868KiB time=00:00:47.97 bitrate=11077.5kbits/s speed= 119x elapsed=0:00:00.40    

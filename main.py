@@ -15,13 +15,15 @@ from module import (
     get_all_random_video_groups,
     list_all_mp3_files,
     mix_audio_with_bgm_ffmpeg,
-    get_next_output_filename
+    get_next_output_filename,
+    read_used_source_videos,
+    read_log_info
 
 )
 import random
 
 IS_WINDOWS = (os.name == 'nt')
-mp3_list = list_all_mp3_files(r"\\192.168.1.92\Ổ Sever Mới\Định\Satisfy ASMR\SHORT AI\render nhac")
+mp3_list = list_all_mp3_files(r"\\nasfmc\Ổ Sever Mới\Định\Satisfy ASMR\SHORT AI\render nhac")
 
 def os_join(*parts: str) -> str:
     return os.path.join(*parts)
@@ -74,7 +76,6 @@ class ConcatApp(tk.Tk):
         self.frm_opts = ttk.LabelFrame(self, text="Tuỳ chọn xuất")
         self.btn_concat = ttk.Button(self.frm_opts, text="▶ Bắt đầu ghép", command=self.start_concat)
         self.btn_stop = ttk.Button(self.frm_opts, text="■ Dừng", command=self.stop_concat, state=tk.DISABLED)
-        self.btn_resume = ttk.Button(self.frm_opts, text="|>>| Tiếp tục chạy", command=self.resume_concat, state=tk.DISABLED)
         self.btn_open_out = ttk.Button(self.frm_opts, text="📂 Mở thư mục lưu", command=self.open_output_folder)
 
         # Thống kê + tiến trình
@@ -101,7 +102,6 @@ class ConcatApp(tk.Tk):
         self.frm_opts.pack(fill=tk.X, **pad)
         self.btn_concat.grid(row=0, column=0, sticky='w', **pad)
         self.btn_stop.grid(row=0, column=1, sticky='w', **pad)
-        self.btn_resume.grid(row=0, column=2, sticky='w', **pad)
         self.btn_open_out.grid(row=0, column=3, sticky='w', **pad)  # CHỈ CẦN ĐỔI lại row=0
 
         self.frm_stats.pack(fill=tk.X, **pad)
@@ -125,8 +125,7 @@ class ConcatApp(tk.Tk):
             return
 
         folder = os_join(ROOT_DIR, dt)
-        out_folder = SAVE_FOLDER   # luôn lưu ở SAVE_FOLDER
-
+        out_folder = SAVE_FOLDER
         self.input_folder_var.set(folder)
         self.save_folder_var.set(out_folder)
 
@@ -136,24 +135,57 @@ class ConcatApp(tk.Tk):
 
         try:
             all_videos = list_all_mp4_files(folder)
-            groups = get_all_random_video_groups(folder)
         except Exception as e:
             messagebox.showerror("Lỗi", f"Lỗi khi đọc video/nhóm:\n{e}")
             return
 
-        self.groups = groups or []
-        total_mp4 = len(all_videos)
-        num_groups = len(self.groups)
+        # đọc log
+        log_dir = os.path.abspath("log")
+        os.makedirs(log_dir, exist_ok=True)
+        date_str = dt.replace("/", ".")
+        log_path = os.path.join(log_dir, f"{date_str}.txt")
 
-        self.total_mp4_var.set(str(total_mp4))
-        self.num_groups_var.set(str(num_groups))
-        self.groups_done_var.set("0")
-        self.progress['value'] = 0
+        used_inputs = set(read_used_source_videos(log_path))
+        done_count = 0
+
+        if os.path.exists(log_path):
+            with open(log_path, "r", encoding="utf-8") as f:
+                done_count = sum(1 for line in f if line.strip())
+
+                total_groups_all = len(list_all_mp4_files(self.input_folder_var.get())) // 6
+                self.progress['maximum'] = total_groups_all
+                self.progress['value'] = done_count
+
+                if self.progress['maximum'] > 0:
+                    percent = (done_count / self.progress['maximum']) * 100
+                    self.status_var.set(f"{percent:.1f}%")
+                else:
+                    self.status_var.set("0%")
+        
+        # lọc video chưa dùng
+        if used_inputs:
+            all_videos = [v for v in all_videos if v not in used_inputs]
+
+        # chia nhóm từ danh sách đã lọc
+        groups = []
+        
+        if used_inputs:
+            all_videos = [v for v in all_videos if v not in used_inputs]
+
+        # chia nhóm bằng hàm random có sẵn
+        groups = get_all_random_video_groups(all_videos, group_size=6)
+
+        self.groups = groups
+        self.total_mp4_var.set(str(len(all_videos)))
+        self.num_groups_var.set(str(len(self.groups)))
+        self.groups_done_var.set(str(done_count))
+        self.progress['value'] = done_count
+
+
 
 
 
     def start_concat(self):
-        self.groups_done_var.set("0")
         if self.worker and self.worker.is_alive():
             messagebox.showinfo("Đang chạy", "Tiến trình đang chạy, hãy dừng trước khi chạy lại.")
             return
@@ -171,64 +203,37 @@ class ConcatApp(tk.Tk):
             messagebox.showerror("Lỗi", f"Không thể tạo thư mục lưu:\n{e}")
             return
 
+        # đọc lại log để biết đã chạy bao nhiêu
+        dt = self.dt_picker.get().strip()
+        log_dir = os.path.abspath("log")
+        date_str = dt.replace("/", ".")
+        log_path = os.path.join(log_dir, f"{date_str}.txt")
+        done_count = 0
+        if os.path.exists(log_path):
+            with open(log_path, "r", encoding="utf-8") as f:
+                done_count = sum(1 for line in f if line.strip())
+
         self.stop_flag.clear()
         self.btn_concat.configure(state=tk.DISABLED)
         self.btn_stop.configure(state=tk.NORMAL)
         self.status_var.set("Đang ghép...")
-        self.progress['value'] = 0
-        self.progress['maximum'] = len(self.groups)
+
+        # giữ nguyên progress từ log thay vì reset về 0
+        folder = self.input_folder_var.get().strip()
+        total_groups_all = len(list_all_mp4_files(folder)) // 6
+        self.progress['maximum'] = total_groups_all
+        self.progress['value'] = done_count
+        self.groups_done_var.set(str(done_count))
 
         args = (self.groups, out_dir)
         self.worker = threading.Thread(target=self._do_concat_worker, args=args, daemon=True)
         self.worker.start()
         self.after(150, self._poll_worker)
 
+
     def stop_concat(self):
         if self.worker and self.worker.is_alive():
             self.stop_flag.set()
-            self.btn_resume.configure(state=tk.NORMAL)
-
-    def resume_concat(self):
-        try:
-        
-            already_done = int(self.groups_done_var.get())
-        except ValueError:
-            already_done = 0
-
-        total_groups = len(self.groups)
-
-        # Đảm bảo không vượt quá số nhóm
-        if already_done >= total_groups:
-            messagebox.showinfo("Không còn nhóm nào", "Tất cả nhóm đã được xử lý.")
-            return
-
-        # Cập nhật lại progress bar nếu cần (phòng trường hợp mất đồng bộ)
-        self.progress['value'] = already_done
-        self.progress['maximum'] = total_groups
-
-        # Lấy danh sách nhóm còn lại
-        todo_remaining = self.groups[already_done:]
-
-        if not todo_remaining:
-            messagebox.showinfo("Không còn nhóm nào", "Không có nhóm nào còn lại để chạy.")
-            return
-
-        out_dir = self.save_folder_var.get().strip()
-        if not out_dir:
-            messagebox.showwarning("Thiếu thư mục lưu", "Hãy chọn thư mục lưu")
-            return
-
-        self.stop_flag.clear()
-        self.btn_concat.configure(state=tk.DISABLED)
-        self.btn_resume.configure(state=tk.DISABLED)
-        self.btn_stop.configure(state=tk.NORMAL)
-        self.status_var.set(f"Tiếp tục từ nhóm {already_done + 1}...")
-
-        # Bắt đầu worker với phần còn lại
-        args = (todo_remaining, out_dir)
-        self.worker = threading.Thread(target=self._do_concat_worker, args=args, daemon=True)
-        self.worker.start()
-        self.after(150, self._poll_worker)
 
 
     def _do_concat_worker(self, todo: list[list[str]], out_dir: str):
@@ -263,7 +268,8 @@ class ConcatApp(tk.Tk):
                                     output_dir=SAVE_FOLDER,
                                     bgm_volume=0.9
                                 )
-                                log_line = f"{os.path.basename(output_video)}: {', '.join(relative_paths)} + BGM: {os.path.basename(bg_audio)}"
+
+                                log_line = f"{os.path.basename(output_video)}: {', '.join(group)} + BGM: {bg_audio}"
                             except Exception as music_err:
                                 log_line = f"ERROR chèn nhạc ({music_err}) | Files: {', '.join(relative_paths)}"
                                 output_video = None
@@ -309,7 +315,6 @@ class ConcatApp(tk.Tk):
         self.btn_concat.configure(state=tk.NORMAL)
         self.btn_stop.configure(state=tk.DISABLED)
         # self.status_var.set("100.0%")
-        self.btn_resume.configure(state=tk.DISABLED)
 
 
     def _poll_worker(self):

@@ -4,8 +4,8 @@ import random
 import re
 import subprocess
 
-ROOT_DIR = r"\\192.168.1.92\Ổ Sever Mới\Định\Satisfy ASMR\SHORT AI\ASMR\Quay mới"
-SAVE_FOLDER = r"\\192.168.1.92\Ổ Sever Mới\Định\Satisfy ASMR\SHORT AI\ASMR\1.HOÀN THIỆN\AI ghép\Đã ghép"
+ROOT_DIR = r"\\nasfmc\Ổ Sever Mới\Định\Satisfy ASMR\SHORT AI\ASMR\Quay mới"
+SAVE_FOLDER = r"\\nasfmc\Ổ Sever Mới\Định\Satisfy ASMR\SHORT AI\ASMR\1.HOÀN THIỆN\AI ghép\Đã ghép"
 
 def get_today_date_str():
     dt = datetime.now().strftime("%d-%m-%y")
@@ -39,16 +39,16 @@ def list_all_mp3_files(folder_path):
                 mp3_files.append(full_path)
     return mp3_files
 
-def get_all_random_video_groups(folder_path, group_size=6):
-    all_videos = list_all_mp4_files(folder_path)
-    random.shuffle(all_videos)
-
+def get_all_random_video_groups(video_list, group_size=6):
+    import random
+    random.shuffle(video_list)
     groups = []
-    for i in range(0, len(all_videos), group_size):
-        group = all_videos[i:i+group_size]
+    for i in range(0, len(video_list), group_size):
+        group = video_list[i:i+group_size]
         if len(group) == group_size:
             groups.append(group)
     return groups
+
 
 
 def get_next_output_filename(folder: str) -> str:
@@ -105,7 +105,51 @@ def mix_audio_with_bgm_ffmpeg(
     print(f'Đã thêm nhạc vào video : {output_video}')
     return output_video
 
+import os
 
+def read_used_source_videos(log_path: str):
+    used_files = []
+    if not os.path.exists(log_path):
+        return used_files
+    
+    with open(log_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or ":" not in line:
+                continue
+            parts = line.split(":", 1)
+            if len(parts) < 2:
+                continue
+            content = parts[1].strip()
+
+            if "+ BGM:" in content:
+                content = content.split("+ BGM:")[0].strip()
+            #split by comma
+            inputs = [p.strip() for p in content.split(",") if p.strip()]
+            used_files.extend(inputs)
+    
+    return used_files
+
+def read_log_info(log_path: str):
+    used_inputs = set()
+    done_count = 0
+    if not os.path.exists(log_path):
+        return used_inputs, done_count
+
+    with open(log_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or ":" not in line:
+                continue
+            done_count += 1
+            # bỏ phần "xxx.mp4:"
+            content = line.split(":", 1)[1]
+            if "+ BGM:" in content:
+                content = content.split("+ BGM:")[0]
+            # tách file input
+            inputs = [p.strip() for p in content.split(",") if p.strip()]
+            used_inputs.update(inputs)
+    return used_inputs, done_count
 
 
 

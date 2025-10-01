@@ -147,10 +147,6 @@ def auto_concat(input_videos, output_path):
     for path in normalized_paths:
         os.remove(path)
 
-    print("Ghép video hoàn tất:", output_path)
-
-
-
 def run_ffmpeg(cmd: list):
     try:
         p = subprocess.run(cmd, check=True, text=True,
