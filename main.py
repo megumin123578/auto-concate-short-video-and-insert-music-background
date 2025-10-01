@@ -6,7 +6,6 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from tkcalendar import DateEntry
 from ffmpeg_helper import auto_concat 
-from insert_music_background_ffmpeg import mix_audio_with_bgm_ffmpeg
 import shutil
 from module import (
     ROOT_DIR,
@@ -14,7 +13,9 @@ from module import (
     get_today_date_str,
     list_all_mp4_files,
     get_all_random_video_groups,
-    list_all_mp3_files
+    list_all_mp3_files,
+    mix_audio_with_bgm_ffmpeg,
+    get_next_output_filename
 
 )
 import random
@@ -42,11 +43,12 @@ class ConcatApp(tk.Tk):
         self.dt_var = tk.StringVar(value=today_str)
         self.use_dt_path_var = tk.BooleanVar(value=True)
         self.input_folder_var = tk.StringVar(value=os_join(ROOT_DIR, today_str))
-        self.save_folder_var = tk.StringVar(value=os_join(SAVE_FOLDER, today_str))
+        self.save_folder_var = tk.StringVar(value=SAVE_FOLDER)
 
         self.total_mp4_var = tk.StringVar(value="0")
         self.num_groups_var = tk.StringVar(value="0")
         self.groups_done_var = tk.StringVar(value="0")
+        
 
         self.groups: list[list[str]] = []
         self.stop_flag = threading.Event()
@@ -55,6 +57,7 @@ class ConcatApp(tk.Tk):
 
         self._build_ui()
         self._layout()
+        self.load_state() 
         self.reload_groups()
 
     def _build_ui(self):
@@ -122,7 +125,8 @@ class ConcatApp(tk.Tk):
             return
 
         folder = os_join(ROOT_DIR, dt)
-        out_folder = os_join(SAVE_FOLDER, dt)
+        out_folder = SAVE_FOLDER   # luôn lưu ở SAVE_FOLDER
+
         self.input_folder_var.set(folder)
         self.save_folder_var.set(out_folder)
 
@@ -143,8 +147,9 @@ class ConcatApp(tk.Tk):
 
         self.total_mp4_var.set(str(total_mp4))
         self.num_groups_var.set(str(num_groups))
-        self.groups_done_var.set("0")  # ✅ reset đúng tại đây
+        self.groups_done_var.set("0")
         self.progress['value'] = 0
+
 
 
     def start_concat(self):
@@ -184,10 +189,28 @@ class ConcatApp(tk.Tk):
             self.btn_resume.configure(state=tk.NORMAL)
 
     def resume_concat(self):
-        already_done = int(self.progress['value'])
-        todo_remaining = self.groups[already_done:]
-        if not todo_remaining:
+        try:
+        
+            already_done = int(self.groups_done_var.get())
+        except ValueError:
+            already_done = 0
+
+        total_groups = len(self.groups)
+
+        # Đảm bảo không vượt quá số nhóm
+        if already_done >= total_groups:
             messagebox.showinfo("Không còn nhóm nào", "Tất cả nhóm đã được xử lý.")
+            return
+
+        # Cập nhật lại progress bar nếu cần (phòng trường hợp mất đồng bộ)
+        self.progress['value'] = already_done
+        self.progress['maximum'] = total_groups
+
+        # Lấy danh sách nhóm còn lại
+        todo_remaining = self.groups[already_done:]
+
+        if not todo_remaining:
+            messagebox.showinfo("Không còn nhóm nào", "Không có nhóm nào còn lại để chạy.")
             return
 
         out_dir = self.save_folder_var.get().strip()
@@ -199,12 +222,14 @@ class ConcatApp(tk.Tk):
         self.btn_concat.configure(state=tk.DISABLED)
         self.btn_resume.configure(state=tk.DISABLED)
         self.btn_stop.configure(state=tk.NORMAL)
-        self.status_var.set("Đang tiếp tục...")
+        self.status_var.set(f"Tiếp tục từ nhóm {already_done + 1}...")
 
+        # Bắt đầu worker với phần còn lại
         args = (todo_remaining, out_dir)
         self.worker = threading.Thread(target=self._do_concat_worker, args=args, daemon=True)
         self.worker.start()
         self.after(150, self._poll_worker)
+
 
     def _do_concat_worker(self, todo: list[list[str]], out_dir: str):
         log_dir = os.path.abspath("log")
@@ -213,59 +238,54 @@ class ConcatApp(tk.Tk):
         log_path = os.path.join(log_dir, f"{date_str}.txt")
 
         script_dir = os.getcwd()
-        start_index = int(self.groups_done_var.get())
 
         try:
-            with open(log_path, "w", encoding="utf-8") as f_log:
+            with open(log_path, "a", encoding="utf-8") as f_log:
                 for i, group in enumerate(todo):
                     if self.stop_flag.is_set():
                         break
 
-                    # === Tên file đúng thứ tự ===
-                    global_index = start_index + i + 1
-                    basename = f"{global_index}"
-                    filename = f"{basename}.mp4"
-                    temp_concat_path = os.path.join(script_dir, "temp.mp4")           # luôn là temp.mp4
-                    final_output_path = os.path.join(out_dir, f'{global_index}.mp4')      
-
+                    temp_concat_path = os.path.join(script_dir, "temp.mp4")  # luôn tạm
 
                     try:
-                        # 1. Ghép video vào file tạm
+                        # 1. Ghép video nhóm thành file tạm
                         auto_concat(group, temp_concat_path)
                         relative_paths = [os.path.relpath(p, start=ROOT_DIR) for p in group]
-                        log_line = f"{filename}: {', '.join(relative_paths)}"
 
-                        # 2. Ghép nhạc nền nếu có
+                        # 2. Chọn nhạc nền
                         bg_audio = get_random_mp3_from_list(mp3_list)
                         if bg_audio and os.path.isfile(bg_audio):
                             try:
-                                mix_audio_with_bgm_ffmpeg(
+                                # mix_audio_with_bgm_ffmpeg đã tự tính số thứ tự và trả về path thực tế
+                                output_video = mix_audio_with_bgm_ffmpeg(
                                     input_video=temp_concat_path,
                                     bgm_audio=bg_audio,
-                                    output_video=final_output_path,
-                                    bgm_volume=0.8
+                                    output_dir=SAVE_FOLDER,
+                                    bgm_volume=0.9
                                 )
-                                log_line += f" + BGM: {os.path.basename(bg_audio)}"
-                                print("Đã lưu:", final_output_path)
+                                log_line = f"{os.path.basename(output_video)}: {', '.join(relative_paths)} + BGM: {os.path.basename(bg_audio)}"
                             except Exception as music_err:
-                                log_line += f" | LỖI chèn nhạc: {music_err}"
+                                log_line = f"ERROR chèn nhạc ({music_err}) | Files: {', '.join(relative_paths)}"
+                                output_video = None
                         else:
-                            shutil.copy2(temp_concat_path, final_output_path)
-                            log_line += " | Không có nhạc nền → chỉ copy"
-                            print("Đã lưu (không nhạc):", final_output_path)
+                            # Không có nhạc nền → copy ra file kế tiếp
+                            output_video = get_next_output_filename(SAVE_FOLDER)
+                            shutil.copy2(temp_concat_path, output_video)
+                            log_line = f"{os.path.basename(output_video)}: {', '.join(relative_paths)} | Không có nhạc nền → chỉ copy"
 
                     except Exception as e:
-                        log_line = f"{filename}: ERROR - {e}"
+                        log_line = f"ERROR ghép video ({e}) | Files: {', '.join(group)}"
+                        output_video = None
 
                     finally:
-                        # 3.delete temp file
+                        # 3. Xoá file tạm
                         if os.path.exists(temp_concat_path):
                             try:
                                 os.remove(temp_concat_path)
                             except Exception as rm_err:
                                 log_line += f" | Lỗi xoá file tạm: {rm_err}"
 
-                    # save log
+                    # 4. Ghi log
                     f_log.write(log_line + "\n")
                     f_log.flush()
                     self._enqueue(lambda: self._inc_progress())
@@ -282,6 +302,7 @@ class ConcatApp(tk.Tk):
         percent = (self.progress['value'] / self.progress['maximum']) * 100
         self.status_var.set(f"{percent:.1f}%")
         self.groups_done_var.set(str(int(self.groups_done_var.get()) + 1))
+        self.save_state() 
 
 
     def _on_worker_done(self):
@@ -304,6 +325,22 @@ class ConcatApp(tk.Tk):
             messagebox.showwarning("Không tìm thấy", "Thư mục lưu chưa tồn tại.")
             return
         os.startfile(path)
+
+    def save_state(self):
+        dt = self.dt_picker.get().strip()
+        path = f"state_{dt}.txt"
+        with open(path, "w") as f:
+            f.write(self.groups_done_var.get())
+
+    def load_state(self):
+        dt = self.dt_picker.get().strip()
+        path = f"state_{dt}.txt"
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                val = f.read().strip()
+                if val.isdigit():
+                    self.groups_done_var.set(val)
+
 
 
 if __name__ == '__main__':

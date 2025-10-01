@@ -1,14 +1,32 @@
 import subprocess
 import os
-import tempfile
+import re
+
+def get_next_output_filename(folder: str) -> str:
+    """
+    Trả về đường dẫn file tiếp theo dạng số.mp4 trong thư mục (ví dụ: 101.mp4 nếu lớn nhất là 100.mp4)
+    """
+    max_index = 0
+    pattern = re.compile(r"(\d+)\.mp4$", re.IGNORECASE)
+
+    for filename in os.listdir(folder):
+        match = pattern.match(filename)
+        if match:
+            index = int(match.group(1))
+            if index > max_index:
+                max_index = index
+
+    next_index = max_index + 1
+    return os.path.join(folder, f"{next_index}.mp4")
 
 def mix_audio_with_bgm_ffmpeg(
     input_video: str,
     bgm_audio: str,
-    output_video: str,
+    output_dir: str,
     bgm_volume: float = 0.5
 ):
-    temp_output = output_video
+    output_video = get_next_output_filename(output_dir)
+    temp_output = output_video + ".temp.mp4"
 
     cmd = [
         "ffmpeg", "-y",
@@ -26,10 +44,12 @@ def mix_audio_with_bgm_ffmpeg(
 
     try:
         subprocess.run(cmd, check=True)
-        # Ghi đè ra file output gốc
         os.replace(temp_output, output_video)
+        print(f"Đã lưu video mới: {output_video}")
     except subprocess.CalledProcessError as e:
         if os.path.exists(temp_output):
-            os.remove(temp_output)  # xóa file tạm nếu lỗi
+            os.remove(temp_output)
         print(f"FFmpeg lỗi: {e}")
         raise
+
+print(get_next_output_filename(r'\\192.168.1.92\Ổ Sever Mới\Định\Satisfy ASMR\SHORT AI\ASMR\1.HOÀN THIỆN\AI ghép\Đã ghép\347.mp4'))

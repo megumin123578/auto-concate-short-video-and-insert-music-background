@@ -119,7 +119,13 @@ def concat_video(video_paths, output_path):
         "-c", "copy",
         output_path
     ]
-    subprocess.run(command, check=True)
+    with open("log/ffmpeg_log.txt", "w", encoding="utf-8") as log_file:
+        subprocess.run(
+            command,
+            check=True,
+            stdout=log_file,
+            stderr=log_file
+        )
     os.remove(list_file)
 
 
